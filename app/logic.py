@@ -11,7 +11,7 @@ from sklearn.metrics import mean_squared_error, r2_score, explained_variance_sco
     mean_absolute_percentage_error, median_absolute_error
 from sklearn.model_selection import train_test_split
 
-from app.algo import Coordinator, Client
+from app.algo import roc_plot
 
 
 class AppLogic:
@@ -43,30 +43,12 @@ class AppLogic:
         self.INPUT_DIR = "/mnt/input"
         self.OUTPUT_DIR = "/mnt/output"
 
-        self.client = None
-        self.input = None
-        self.sep = None
-        self.label_column = None
-        self.test_size = None
-        self.random_state = None
-        self.X = None
-        self.y = None
-        self.X_test = None
+        self.y_test_filename = None
+        self.y_pred_filename = None
+        self.output_format = None
         self.y_test = None
-        self.epsilon = None
-
-    def read_config(self):
-        with open(self.INPUT_DIR + '/config.yml') as f:
-            config = yaml.load(f, Loader=yaml.FullLoader)['fc_linear_regression']
-            self.input = config['files']['input']
-            self.sep = config['files']['sep']
-            self.label_column = config['files']['label_column']
-            self.epsilon = config['differential_privacy']['epsilon']
-            self.test_size = config['evaluation']['test_size']
-            self.random_state = config['evaluation']['random_state']
-
-        shutil.copyfile(self.INPUT_DIR + '/config.yml', self.OUTPUT_DIR + '/config.yml')
-        print(f'Read config file.', flush=True)
+        self.y_proba = None
+        self.plt = None
 
     def handle_setup(self, client_id, coordinator, clients):
         # This method is called once upon startup and contains information about the execution context of this instance
@@ -83,6 +65,16 @@ class AppLogic:
         print("Process incoming data....")
         self.data_incoming.append(data.read())
 
+    def read_config(self):
+        with open(self.INPUT_DIR + '/config.yml') as f:
+            config = yaml.load(f, Loader=yaml.FullLoader)['fc_roc']
+            self.y_test_filename = config['files']['y_test']
+            self.y_pred_filename = config['files']['y_pred']
+            self.output_format = config['files']['output_format']
+
+        shutil.copyfile(self.INPUT_DIR + '/config.yml', self.OUTPUT_DIR + '/config.yml')
+        print(f'Read config file.', flush=True)
+
     def handle_outgoing(self):
         print("Process outgoing data...")
         # This method is called when data is requested
@@ -95,11 +87,9 @@ class AppLogic:
         # === States ===
         state_initializing = 1
         state_read_input = 2
-        state_local_computation = 3
-        state_wait_for_aggregation = 4
-        state_global_aggregation = 5
-        state_writing_results = 6
-        state_finishing = 7
+        state_plot = 3
+        state_writing_results = 4
+        state_finishing = 5
 
         # Initial state
         state = state_initializing
@@ -111,97 +101,24 @@ class AppLogic:
                 if self.id is not None:  # Test if setup has happened already
                     state = state_read_input
                     print("[CLIENT] Coordinator", self.coordinator)
-                    if self.coordinator:
-                        self.client = Coordinator()
-                    else:
-                        self.client = Client()
+
             if state == state_read_input:
                 print('[CLIENT] Read input and config')
                 self.read_config()
+                self.y_test = pd.read_csv(self.y_pred_filename)
+                self.y_proba = pd.read_csv(self.y_proba_filename)
 
-                numerics = ['int16', 'int32', 'int64', 'float16', 'float32', 'float64']
-                self.X = pd.read_csv(self.INPUT_DIR + "/" + self.input, sep=self.sep).select_dtypes(
-                    include=numerics).dropna()
-                self.y = self.X.loc[:, self.label_column]
-                self.X = self.X.drop(self.label_column, axis=1)
-
-                if self.test_size is not None:
-                    self.X, self.X_test, self.y, self.y_test = train_test_split(self.X, self.y,
-                                                                                test_size=self.test_size,
-                                                                                random_state=self.random_state)
-                state = state_local_computation
-            if state == state_local_computation:
-                print("[CLIENT] Perform local computation")
-                self.progress = 'local computation'
-                xtx, xty = self.client.local_computation(self.X, self.y, eps=self.epsilon)
-
-                data_to_send = jsonpickle.encode([xtx, xty])
-
-                if self.coordinator:
-                    self.data_incoming.append(data_to_send)
-                    state = state_global_aggregation
-                else:
-                    self.data_outgoing = data_to_send
-                    self.status_available = True
-                    state = state_wait_for_aggregation
-                    print(f'[CLIENT] Sending computation data to coordinator', flush=True)
-            if state == state_wait_for_aggregation:
-                print("[CLIENT] Wait for aggregation")
-                self.progress = 'wait for aggregation'
-                if len(self.data_incoming) > 0:
-                    print("[CLIENT] Received aggregation data from coordinator.")
-                    global_coefs = jsonpickle.decode(self.data_incoming[0])
-                    self.data_incoming = []
-                    self.client.set_coefs(global_coefs)
-                    state = state_writing_results
-
-            # GLOBAL PART
-
-            if state == state_global_aggregation:
-                print("[CLIENT] Global computation")
-                self.progress = 'computing...'
-                if len(self.data_incoming) == len(self.clients):
-                    data = [jsonpickle.decode(client_data) for client_data in self.data_incoming]
-                    self.data_incoming = []
-                    aggregated_beta = self.client.aggregate_beta(data)
-                    self.client.set_coefs(aggregated_beta)
-                    data_to_broadcast = jsonpickle.encode(aggregated_beta)
-                    self.data_outgoing = data_to_broadcast
-                    self.status_available = True
-                    state = state_writing_results
-                    print(f'[CLIENT] Broadcasting computation data to clients', flush=True)
+                state = state_plot
+            if state == state_plot:
+                self.plt = roc_plot(self.y_test, self.y_proba)
             if state == state_writing_results:
-                print("[CLIENT] Writing results")
-                # now you can save it to a file
-                joblib.dump(self.client, self.OUTPUT_DIR + '/model.pkl')
-                model = self.client
-
-                if self.test_size is not None:
-                    # Make predictions using the testing set
-                    y_pred = model.predict(self.X_test)
-
-                    # The mean squared error
-                    scores = {
-                        "r2_score": [r2_score(self.y_test, y_pred)],
-                        "explained_variance_score": [explained_variance_score(self.y_test, y_pred)],
-                        "max_error": [max_error(self.y_test, y_pred)],
-                        "mean_absolute_error": [mean_absolute_error(self.y_test, y_pred)],
-                        "mean_squared_error": [mean_squared_error(self.y_test, y_pred)],
-                        "mean_absolute_percentage_error": [mean_absolute_percentage_error(self.y_test, y_pred)],
-                        "median_absolute_error": [median_absolute_error(self.y_test, y_pred)]
-                    }
-
-                    scores_df = pd.DataFrame.from_dict(scores).T
-                    scores_df = scores_df.rename({0: "score"}, axis=1)
-                    os.mkdir(self.OUTPUT_DIR + "/evaluation")
-                    scores_df.to_csv(self.OUTPUT_DIR + "/evaluation/scores.csv")
-
+                self.plt.savefig("roc_plot.png")
                 state = state_finishing
             if state == state_finishing:
                 print("[CLIENT] Finishing")
                 self.progress = 'finishing...'
                 if self.coordinator:
-                    time.sleep(10)
+                    time.sleep(3)
                 self.status_finished = True
                 break
 
