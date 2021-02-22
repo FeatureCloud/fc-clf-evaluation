@@ -1,15 +1,10 @@
-import os
+import pickle
 import shutil
 import threading
 import time
 
-import joblib
-import jsonpickle
 import pandas as pd
 import yaml
-from sklearn.metrics import mean_squared_error, r2_score, explained_variance_score, max_error, mean_absolute_error, \
-    mean_absolute_percentage_error, median_absolute_error
-from sklearn.model_selection import train_test_split
 
 from app.algo import roc_plot
 
@@ -44,11 +39,12 @@ class AppLogic:
         self.OUTPUT_DIR = "/mnt/output"
 
         self.y_test_filename = None
-        self.y_pred_filename = None
+        self.y_proba_filename = None
         self.output_format = None
         self.y_test = None
         self.y_proba = None
         self.plt = None
+        self.df = None
 
     def handle_setup(self, client_id, coordinator, clients):
         # This method is called once upon startup and contains information about the execution context of this instance
@@ -69,7 +65,7 @@ class AppLogic:
         with open(self.INPUT_DIR + '/config.yml') as f:
             config = yaml.load(f, Loader=yaml.FullLoader)['fc_roc']
             self.y_test_filename = config['files']['y_test']
-            self.y_pred_filename = config['files']['y_pred']
+            self.y_proba_filename = config['files']['y_proba']
             self.output_format = config['files']['output_format']
 
         shutil.copyfile(self.INPUT_DIR + '/config.yml', self.OUTPUT_DIR + '/config.yml')
@@ -101,18 +97,32 @@ class AppLogic:
                 if self.id is not None:  # Test if setup has happened already
                     state = state_read_input
                     print("[CLIENT] Coordinator", self.coordinator)
-
             if state == state_read_input:
                 print('[CLIENT] Read input and config')
                 self.read_config()
-                self.y_test = pd.read_csv(self.y_pred_filename)
-                self.y_proba = pd.read_csv(self.y_proba_filename)
 
+                if self.y_test_filename.endswith(".csv"):
+                    self.y_test = pd.read_csv(self.INPUT_DIR + "/" + self.y_test_filename, sep=",")
+                elif self.y_test_filename.endswith(".tsv"):
+                    self.y_test = pd.read_csv(self.INPUT_DIR + "/" + self.y_test_filename, sep="\t")
+                else:
+                    self.y_test = pickle.load(self.INPUT_DIR + "/" + self.y_test_filename)
+
+                if self.y_proba_filename.endswith(".csv"):
+                    self.y_proba = pd.read_csv(self.INPUT_DIR + "/" + self.y_proba_filename, sep=",")
+                elif self.y_proba_filename.endswith(".tsv"):
+                    self.y_proba = pd.read_csv(self.INPUT_DIR + "/" + self.y_proba_filename, sep="\t")
+                else:
+                    self.y_proba = pickle.load(self.INPUT_DIR + "/" + self.y_proba_filename)
                 state = state_plot
             if state == state_plot:
-                self.plt = roc_plot(self.y_test, self.y_proba)
+                print('[CLIENT] Compute and create plot')
+                self.plt, self.df = roc_plot(self.y_test, self.y_proba)
+                state = state_writing_results
             if state == state_writing_results:
-                self.plt.savefig("roc_plot.png")
+                print('[CLIENT] Save results')
+                self.plt.savefig(self.OUTPUT_DIR + "/roc. " + self.output_format, format=self.output_format)
+                self.df.to_csv(self.OUTPUT_DIR + "/roc.csv", index=False)
                 state = state_finishing
             if state == state_finishing:
                 print("[CLIENT] Finishing")
