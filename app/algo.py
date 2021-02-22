@@ -1,8 +1,5 @@
-from sklearn.datasets import load_breast_cancer
-from sklearn.linear_model import LogisticRegression
 import matplotlib.pyplot as plt
 from sklearn.metrics import roc_auc_score, roc_curve
-from sklearn.model_selection import train_test_split
 import pandas as pd
 
 
@@ -37,21 +34,3 @@ def roc_plot(y_test, y_proba):
     plt.legend()
 
     return plt, df
-
-
-brca = load_breast_cancer()
-X = brca.data
-y = brca.target
-clf = LogisticRegression(max_iter=10000)
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=0)
-clf.fit(X, y)
-y_proba = clf.predict_proba(X_test)
-y_proba = pd.DataFrame(y_proba)
-y_proba.to_csv("y_proba.csv", index=False)
-y_test = pd.DataFrame(y_test)
-y_test.to_csv("y_test.csv", index=False)
-
-roc, df = roc_plot(y_test, y_proba)
-roc.show()
-
-
