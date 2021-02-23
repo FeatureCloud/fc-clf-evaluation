@@ -6,7 +6,8 @@ from pandas.testing import assert_frame_equal
 from sklearn.metrics import roc_auc_score
 
 from app.algo import check, aggregate_confusion_matrices, compute_threshold_conf_matrices, \
-    compute_min_max_score, agg_compute_thresholds, compute_roc_parameters, roc_plot, compute_roc_auc
+    compute_min_max_score, agg_compute_thresholds, compute_roc_parameters, roc_plot, compute_roc_auc, find_nearest, \
+    create_score_df
 
 
 class TestROC(unittest.TestCase):
@@ -34,7 +35,8 @@ class TestROC(unittest.TestCase):
         confs1 = compute_threshold_conf_matrices(y_test1, y_proba1, self.thresholds_global)
         confs2 = compute_threshold_conf_matrices(y_test2, y_proba2, self.thresholds_global)
         self.confusion_matrices_global = aggregate_confusion_matrices([confs1, confs2])
-
+        idx = find_nearest(self.thresholds_global, 0.5)
+        self.confusion_matrix_global = self.confusion_matrices_global[idx]
         self.roc_params_central = compute_roc_parameters(self.confusion_matrices_central, self.thresholds_central)
         self.roc_params_global = compute_roc_parameters(self.confusion_matrices_global, self.thresholds_global)
 
@@ -44,9 +46,10 @@ class TestROC(unittest.TestCase):
         plot_global, self.df_global = roc_plot(self.roc_params_global["FPR"], self.roc_params_global["TPR"],
                                                self.roc_params_global["THR"])
 
+
         self.auc_central = roc_auc_score(y_test, y_proba)
         self.auc_global = compute_roc_auc(self.roc_params_global["FPR"], self.roc_params_global["TPR"])
-
+        df_scores = create_score_df(self.confusion_matrix_global, self.auc_global)
 
     def test_thresholds(self):
         for i in range(len(self.thresholds_central)):

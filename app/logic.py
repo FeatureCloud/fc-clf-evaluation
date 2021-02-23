@@ -8,7 +8,7 @@ import pandas as pd
 import yaml
 
 from app.algo import roc_plot, check, compute_min_max_score, compute_threshold_conf_matrices, compute_roc_parameters, \
-    agg_compute_thresholds, aggregate_confusion_matrices
+    agg_compute_thresholds, aggregate_confusion_matrices, create_score_df, find_nearest, compute_roc_auc
 
 
 class AppLogic:
@@ -47,9 +47,12 @@ class AppLogic:
         self.y_proba = None
         self.thresholds = None
         self.confusion_matrix = None
+        self.confusion_matrices = None
         self.roc_params = None
+        self.roc_auc = None
         self.plt = None
         self.df = None
+        self.score_df = None
 
     def handle_setup(self, client_id, coordinator, clients):
         # This method is called once upon startup and contains information about the execution context of this instance
@@ -174,14 +177,18 @@ class AppLogic:
                 self.progress = 'wait for confusion matrix'
                 if len(self.data_incoming) > 0:
                     print("[CLIENT] Received aggregated confusion matrix from coordinator.")
-                    self.confusion_matrix = jsonpickle.decode(self.data_incoming[0])
+                    self.confusion_matrices = jsonpickle.decode(self.data_incoming[0])
                     self.data_incoming = []
 
                     state = state_compute_roc
 
             if state == state_compute_roc:
                 print('[CLIENT] Compute roc parameters')
-                self.roc_params = compute_roc_parameters(self.confusion_matrix, self.thresholds)
+                self.roc_params = compute_roc_parameters(self.confusion_matrices, self.thresholds)
+                self.roc_auc = compute_roc_auc(self.roc_params["FPR"], self.roc_params["TPR"])
+                idx = find_nearest(self.thresholds, 0.5)
+                self.confusion_matrix = self.confusion_matrices[idx]
+                self.score_df = create_score_df(self.confusion_matrix, self.roc_auc)
                 state = state_writing_results
 
             if state == state_writing_results:
@@ -189,6 +196,7 @@ class AppLogic:
                 plt, df = roc_plot(self.roc_params["FPR"], self.roc_params["TPR"], self.roc_params["THR"])
                 plt.savefig(self.OUTPUT_DIR + "/roc. " + self.output_format, format=self.output_format)
                 df.to_csv(self.OUTPUT_DIR + "/roc.csv", index=False)
+                self.score_df.to_csv(self.OUTPUT_DIR + "/scores.csv", index=False)
                 state = state_finishing
 
             if state == state_finishing:
@@ -215,13 +223,13 @@ class AppLogic:
                     print(f'[CLIENT] Broadcasting aggregated thresholds to clients', flush=True)
 
             if state == state_aggregate_confusion_matrices:
-                print("[CLIENT] Aggregate confusion matricecs")
+                print("[CLIENT] Aggregate confusion matrices")
                 self.progress = 'computing...'
                 if len(self.data_incoming) == len(self.clients):
                     data = [jsonpickle.decode(client_data) for client_data in self.data_incoming]
                     self.data_incoming = []
-                    self.confusion_matrix = aggregate_confusion_matrices(data)
-                    data_to_broadcast = jsonpickle.encode(self.confusion_matrix)
+                    self.confusion_matrices = aggregate_confusion_matrices(data)
+                    data_to_broadcast = jsonpickle.encode(self.confusion_matrices)
                     self.data_outgoing = data_to_broadcast
                     self.status_available = True
                     state = state_compute_roc

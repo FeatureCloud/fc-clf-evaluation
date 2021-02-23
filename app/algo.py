@@ -22,26 +22,18 @@ def confusion_matrix(y_test, y_proba, threshold=0.5, positive_label=1):
     tp = fp = tn = fn = 0
     bool_actuals = [act == positive_label for act in y_test]
     for truth, score in zip(bool_actuals, y_proba):
-        if float(score) > float(threshold):  # predicted positive
-            if truth:  # actually positive
+        if float(score) > float(threshold):
+            if truth:
                 tp += 1
-            else:  # actually negative
+            else:
                 fp += 1
-        else:  # predicted negative
-            if not truth:  # actually negative
+        else:
+            if not truth:
                 tn += 1
-            else:  # actually positive
+            else:
                 fn += 1
 
     return {"TP": tp, "FP": fp, "TN": tn, "FN": fn}
-
-
-def false_positive_rate(conf_mtrx):
-    return conf_mtrx["FP"] / (conf_mtrx["FP"] + conf_mtrx["TN"]) if (conf_mtrx["FP"] + conf_mtrx["TN"]) != 0 else 0
-
-
-def true_positive_rate(conf_mtrx):
-    return conf_mtrx["TP"] / (conf_mtrx["TP"] + conf_mtrx["FN"]) if (conf_mtrx["TP"] + conf_mtrx["FN"]) != 0 else 0
 
 
 def aggregate_confusion_matrices(confusion_matrices):
@@ -74,17 +66,20 @@ def agg_compute_thresholds(local_min_max_scores):
     return thresholds
 
 
+def find_nearest(array, value):
+    array = np.asarray(array)
+    idx = (np.abs(array - value)).argmin()
+    return idx
+
+
 def compute_threshold_conf_matrices(actuals, scores, thresholds):
-    # calculate confusion matrices for all thresholds
     confusion_matrices = []
     for threshold in thresholds:
         confusion_matrices.append(confusion_matrix(actuals, scores, threshold))
-        # apply functions to confusion matrices
     return confusion_matrices
 
 
 def compute_roc_parameters(confusion_matrices, thresholds):
-    # apply functions to confusion matrices
     results = {"FPR": list(map(false_positive_rate, confusion_matrices)),
                "TPR": list(map(true_positive_rate, confusion_matrices)),
                "THR": thresholds}
@@ -97,15 +92,12 @@ def roc_plot(fpr, tpr, thresholds):
 
     df = pd.DataFrame(data=[fpr, tpr, thresholds]).transpose()
     df.columns = ["fpr", "tpr", "thresholds"]
-    # plot the roc curve for the model
     plt.title("Receiver operating characteristic")
     plt.plot(fpr, tpr, color='darkorange', label='AUC: %.3f' % auc)
-    # axis labels
     plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
 
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
-    # show the legend
     plt.legend()
 
     return plt, df
@@ -113,6 +105,71 @@ def roc_plot(fpr, tpr, thresholds):
 
 def compute_roc_auc(fpr, tpr):
     auc = -1 * np.trapz(tpr, fpr)
-
     return auc
 
+
+def false_positive_rate(conf_mtrx):
+    fp = conf_mtrx["FP"]
+    tn = conf_mtrx["TN"]
+    fpr = fp / (fp + tn) if (fp + tn) != 0 else 0
+    return fpr
+
+
+def true_positive_rate(conf_mtrx):
+    tp = conf_mtrx["TP"]
+    fn = conf_mtrx["FN"]
+    tpr = tp / (tp + fn) if (tp + fn) != 0 else 0
+    return tpr
+
+
+def sensitivity(tp, fn):
+    sens = tp / (tp + fn) if (tp + fn) != 0 else 0
+    return sens
+
+
+def specificity(tn, fp):
+    spec = tn / (tn + fp) if (tn + fp) != 0 else 0
+    return spec
+
+
+def accuracy(tn, tp, fn, fp):
+    acc = (tn + tp) / (tn + tp + fn + fp) if (tn + tp + fn + fp) != 0 else 0
+    return acc
+
+
+def precision(tp, fp):
+    prec = tp / (tp + fp)
+    return prec
+
+
+def recall(tp, fn):
+    rec = tp / (tp + fn)
+    return rec
+
+
+def f1_score(prec, rec):
+    f1 = 2 * (prec * rec) / (prec + rec)
+    return f1
+
+
+def create_score_df(conf_mtrx, roc_auc):
+    tp = conf_mtrx["TP"]
+    tn = conf_mtrx["TN"]
+    fp = conf_mtrx["FP"]
+    fn = conf_mtrx["FN"]
+
+    sens = sensitivity(tp, fn)
+    spec = specificity(tn, fp)
+    acc = accuracy(tn, tp, fn, fp)
+    prec = precision(tp, fp)
+    rec = recall(tp, fn)
+    f1 = f1_score(prec, rec)
+
+    scores = ["roc_auc", "sensitivity", "specificity", "accuracy", "precision", "recall", "f1_score"]
+    data = [roc_auc, sens, spec, acc, prec, rec, f1]
+
+    df = pd.DataFrame(list(zip(scores, data)), columns=["metric", "score"])
+
+    print(df)
+
+    return df
