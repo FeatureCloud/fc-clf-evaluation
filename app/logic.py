@@ -194,7 +194,7 @@ class AppLogic:
             if state == state_writing_results:
                 print('[CLIENT] Save results')
                 plt, df = roc_plot(self.roc_params["FPR"], self.roc_params["TPR"], self.roc_params["THR"])
-                plt.savefig(self.OUTPUT_DIR + "/roc. " + self.output_format, format=self.output_format)
+                plt.savefig(self.OUTPUT_DIR + "/roc." + self.output_format, format=self.output_format)
                 df.to_csv(self.OUTPUT_DIR + "/roc.csv", index=False)
                 self.score_df.to_csv(self.OUTPUT_DIR + "/scores.csv", index=False)
                 state = state_finishing
