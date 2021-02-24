@@ -46,7 +46,6 @@ class TestROC(unittest.TestCase):
         plot_global, self.df_global = roc_plot(self.roc_params_global["FPR"], self.roc_params_global["TPR"],
                                                self.roc_params_global["THR"])
 
-
         self.auc_central = roc_auc_score(y_test, y_proba)
         self.auc_global = compute_roc_auc(self.roc_params_global["FPR"], self.roc_params_global["TPR"])
 
