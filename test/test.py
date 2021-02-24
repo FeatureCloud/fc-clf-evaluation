@@ -49,7 +49,6 @@ class TestROC(unittest.TestCase):
 
         self.auc_central = roc_auc_score(y_test, y_proba)
         self.auc_global = compute_roc_auc(self.roc_params_global["FPR"], self.roc_params_global["TPR"])
-        df_scores = create_score_df(self.confusion_matrix_global, self.auc_global)
 
     def test_thresholds(self):
         for i in range(len(self.thresholds_central)):

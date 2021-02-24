@@ -147,6 +147,14 @@ def recall(tp, fn):
     return rec
 
 
+def matthews_corrcoef(tp, tn, fp, fn):
+    denominator = tp * tn - fp * fn
+    numerator = np.sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn))
+    mcc = denominator/numerator
+
+    return mcc
+
+
 def f1_score(prec, rec):
     f1 = 2 * (prec * rec) / (prec + rec)
     return f1
@@ -164,12 +172,11 @@ def create_score_df(conf_mtrx, roc_auc):
     prec = precision(tp, fp)
     rec = recall(tp, fn)
     f1 = f1_score(prec, rec)
+    mcc = matthews_corrcoef(tp, tn, fp, fn)
 
-    scores = ["roc_auc", "sensitivity", "specificity", "accuracy", "precision", "recall", "f1_score"]
-    data = [roc_auc, sens, spec, acc, prec, rec, f1]
+    scores = ["roc_auc", "sensitivity", "specificity", "accuracy", "precision", "recall", "f1_score", "mcc"]
+    data = [roc_auc, sens, spec, acc, prec, rec, f1, mcc]
 
     df = pd.DataFrame(list(zip(scores, data)), columns=["metric", "score"])
-
-    print(df)
 
     return df
