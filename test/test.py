@@ -1,72 +1,83 @@
 import unittest
 
-import numpy as np
 import pandas as pd
-from pandas.testing import assert_frame_equal
-from sklearn.metrics import roc_auc_score
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, \
+    matthews_corrcoef as matthews_corrcoef_score, confusion_matrix
+from sklearn.model_selection import train_test_split
 
-from app.algo import check, aggregate_confusion_matrices, compute_threshold_conf_matrices, \
-    compute_min_max_score, agg_compute_thresholds, compute_roc_parameters, roc_plot, compute_roc_auc, find_nearest, \
-    create_score_df
+from app.algo import check, aggregate_confusion_matrices, compute_confusion_matrix, matthews_corrcoef, f1, recall, \
+    precision, accuracy, specificity, sensitivity
 
 
 class TestROC(unittest.TestCase):
     def setUp(self):
-        y_proba = pd.read_csv("y_proba.csv")
-        y_test = pd.read_csv("y_test.csv")
+        data = pd.read_csv("ilpd.csv")
+        y = data["10"]
+        X = data.drop("10", axis=1)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+        model = LogisticRegression()
+        model.fit(X_train, y_train)
+        y_pred = pd.Series(model.predict(X_test))
+        y_pred = y_pred.rename("y_pred")
+        y_pred.to_csv("y_pred.csv", index=False)
+        y_test = y_test.rename("y_true")
+        y_test.to_csv("y_test.csv", index=False)
+        self.y_pred = pd.read_csv("y_pred.csv")
+        self.y_test = pd.read_csv("y_test.csv")
 
-        y_proba1 = y_proba.iloc[:150, :]
-        y_proba2 = y_proba.iloc[150:, :]
+        print(self.y_pred.shape)
+        print(self.y_test.shape)
 
-        y_test1 = y_test.iloc[:150, :]
-        y_test2 = y_test.iloc[150:, :]
+        y_pred1 = self.y_pred.iloc[:150, :]
+        y_pred2 = self.y_pred.iloc[150:, :]
 
-        y_test, y_proba = check(y_test, y_proba)
-        y_test1, y_proba1 = check(y_test1, y_proba1)
-        y_test2, y_proba2 = check(y_test2, y_proba2)
+        y_test1 = self.y_test.iloc[:150, :]
+        y_test2 = self.y_test.iloc[150:, :]
 
-        min, max = compute_min_max_score(y_proba)
-        min1, max1 = compute_min_max_score(y_proba1)
-        min2, max2 = compute_min_max_score(y_proba2)
-        self.thresholds_central = agg_compute_thresholds([[min, max]])
-        self.thresholds_global = agg_compute_thresholds([[min1, max1], [min2, max2]])
+        self.y_test, self.y_pred = check(self.y_test, self.y_pred)
+        y_test1, y_pred1 = check(y_test1, y_pred1)
+        y_test2, y_pred2 = check(y_test2, y_pred2)
 
-        self.confusion_matrices_central = compute_threshold_conf_matrices(y_test, y_proba, self.thresholds_central)
-        confs1 = compute_threshold_conf_matrices(y_test1, y_proba1, self.thresholds_global)
-        confs2 = compute_threshold_conf_matrices(y_test2, y_proba2, self.thresholds_global)
-        self.confusion_matrices_global = aggregate_confusion_matrices([confs1, confs2])
-        idx = find_nearest(self.thresholds_global, 0.5)
-        self.confusion_matrix_global = self.confusion_matrices_global[idx]
-        self.roc_params_central = compute_roc_parameters(self.confusion_matrices_central, self.thresholds_central)
-        self.roc_params_global = compute_roc_parameters(self.confusion_matrices_global, self.thresholds_global)
-
-        plot_central, self.df_central = roc_plot(self.roc_params_central["FPR"], self.roc_params_central["TPR"],
-                                                 self.roc_params_central["THR"])
-
-        plot_global, self.df_global = roc_plot(self.roc_params_global["FPR"], self.roc_params_global["TPR"],
-                                               self.roc_params_global["THR"])
-
-        self.auc_central = roc_auc_score(y_test, y_proba)
-        self.auc_global = compute_roc_auc(self.roc_params_global["FPR"], self.roc_params_global["TPR"])
-
-    def test_thresholds(self):
-        for i in range(len(self.thresholds_central)):
-            self.assertEqual(self.thresholds_central[i], self.thresholds_global[i])
+        self.confusion_matrix_central = compute_confusion_matrix(self.y_test, self.y_pred, 0.5)
+        confs1 = compute_confusion_matrix(y_test1, y_pred1, 0.5)
+        confs2 = compute_confusion_matrix(y_test2, y_pred2, 0.5)
+        self.confusion_matrix_global = aggregate_confusion_matrices([confs1, confs2])
 
     def test_confs(self):
-        for i in range(len(self.confusion_matrices_central)):
-            self.assertDictEqual(self.confusion_matrices_central[i], self.confusion_matrices_global[i])
+        conf_sklearn = confusion_matrix(self.y_test, self.y_pred)
+        tn, fp, fn, tp = conf_sklearn.ravel()
+        self.assertDictEqual(self.confusion_matrix_central, self.confusion_matrix_global)
+        self.assertEqual(tn, self.confusion_matrix_global["TN"])
+        self.assertEqual(tp, self.confusion_matrix_global["TP"])
+        self.assertEqual(fn, self.confusion_matrix_global["FN"])
+        self.assertEqual(fp, self.confusion_matrix_global["FP"])
 
-    def test_roc_params(self):
-        for key in self.roc_params_central.keys():
-            for i in range(len(self.roc_params_central[key])):
-                self.assertEqual(self.roc_params_central[key][i], self.roc_params_global[key][i])
 
-    def test_frames(self):
-        assert_frame_equal(self.df_central, self.df_global)
+    def test_scores(self):
+        tp = self.confusion_matrix_global["TP"]
+        tn = self.confusion_matrix_global["TN"]
+        fp = self.confusion_matrix_global["FP"]
+        fn = self.confusion_matrix_global["FN"]
 
-    def test_auc(self):
-        self.assertEqual(self.auc_global, self.auc_central)
+        sens_global = sensitivity(tp, fn)
+        spec_global = specificity(tn, fp)
+        acc_global = accuracy(tn, tp, fn, fp)
+        prec_global = precision(tp, fp)
+        rec_global = recall(tp, fn)
+        f1_global = f1(prec_global, rec_global)
+        mcc_global = matthews_corrcoef(tp, tn, fp, fn)
+
+        acc_sklearn = accuracy_score(self.y_test, self.y_pred)
+        self.assertEqual(acc_sklearn, acc_global)
+        f1_sklearn = f1_score(self.y_test, self.y_pred)
+        self.assertEqual(f1_sklearn, f1_global)
+        mcc_sklearn = matthews_corrcoef_score(self.y_test, self.y_pred)
+        self.assertEqual(mcc_sklearn, mcc_global)
+        prec_sklearn = precision_score(self.y_test, self.y_pred)
+        self.assertEqual(prec_sklearn, prec_global)
+        rec_sklearn = recall_score(self.y_test, self.y_pred)
+        self.assertEqual(rec_sklearn, rec_global)
 
 
 if __name__ == "__main__":
