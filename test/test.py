@@ -79,6 +79,14 @@ class TestROC(unittest.TestCase):
         rec_sklearn = recall_score(self.y_test, self.y_pred)
         self.assertEqual(rec_sklearn, rec_global)
 
+# mean_auc = round(np.mean(aucs, axis=0), 3)
+# std_auc = round(np.std(aucs), 3)
+# print(tprs)
+# mean_tprs = np.mean(tprs, axis=0)
+# mean_fprs = np.mean(fprs, axis=0)
+#
+# fig.add_trace(go.Scatter(x=mean_fprs, y=mean_tprs, name=f'Mean ROC (AUC = {mean_auc}) +/- {std_auc}', mode='lines'))
+
 
 if __name__ == "__main__":
     unittest.main()

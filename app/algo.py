@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-
+import plotly.graph_objects as go
 
 def check(y_test, y_pred):
     if isinstance(y_test, pd.DataFrame):
@@ -144,10 +144,10 @@ def recall(tp, fn):
 
 
 def matthews_corrcoef(tp, tn, fp, fn):
-    denominator = tp * tn - fp * fn
-    numerator = np.sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn))
-    mcc = denominator/numerator
-
+    try:
+        mcc = (tp * tn - fp * fn) / (np.sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn)))
+    except:
+        mcc = np.nan
     return mcc
 
 
@@ -175,4 +175,25 @@ def create_score_df(conf_mtrx):
 
     df = pd.DataFrame(list(zip(scores, data)), columns=["metric", "score"])
 
+    return df, data
+
+def create_cv_accumulation(accs, f1s, mccs, precs, recs):
+    scores = [accs, f1s, mccs, precs, recs]
+    cols = ["accuracy", "f1-score", "mcc", "precision", "recall"]
+
+    df = pd.DataFrame(data=scores).transpose()
+    df.columns = cols
+
     return df
+
+def plot_boxplots(df, title):
+    fig = go.Figure()
+    fig.add_trace(go.Box(y=df["accuracy"], quartilemethod="linear", name="Accuracy"))
+    fig.add_trace(go.Box(y=df["precision"], quartilemethod="linear", name="Precision"))
+    fig.add_trace(go.Box(y=df["recall"], quartilemethod="linear", name="Recall"))
+    fig.add_trace(go.Box(y=df["f1-score"], quartilemethod="linear", name="f1-score"))
+    fig.add_trace(go.Box(y=df["mcc"], quartilemethod="linear", name="MCC"))
+    fig.update_layout(title=title)
+    fig.update_yaxes(range=[0, 1])
+
+    return fig

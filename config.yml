@@ -6,4 +6,4 @@ fc_classification_evaluation:
     sep: ","
   split:
     mode: "directory" # or file
-    dir: "data" # or "." for root directory
+    dir: "test" # or "." for root directory
