@@ -84,8 +84,7 @@ class AppLogic:
             self.splits = dict.fromkeys([f.path for f in os.scandir(f'{self.INPUT_DIR}/{self.dir}') if f.is_dir()])
         else:
             self.splits[self.INPUT_DIR] = None
-        print(self.mode)
-        print(self.splits)
+
         for split in self.splits.keys():
             os.makedirs(split.replace("/input/", "/output/"), exist_ok=True)
         shutil.copyfile(self.INPUT_DIR + '/config.yml', self.OUTPUT_DIR + '/config.yml')
@@ -171,14 +170,12 @@ class AppLogic:
                 if len(self.data_incoming) > 0:
                     print("[CLIENT] Received aggregated confusion matrices from coordinator.", flush=True)
                     self.confusion_matrices_global = jsonpickle.decode(self.data_incoming[0])
-                    print(self.confusion_matrices_global)
                     self.data_incoming = []
 
                     state = state_compute_scores
 
             if state == state_compute_scores:
                 print('[CLIENT] Compute scores parameters', flush=True)
-                print(self.confusion_matrices_global)
                 sens = []
                 specs = []
                 accs = []
@@ -187,7 +184,7 @@ class AppLogic:
                 fs = []
                 mccs = []
 
-                for split in self.splits:
+                for split in self.splits.keys():
                     self.score_dfs[split], data = create_score_df(self.confusion_matrices_global[split])
                     sens.append(data[0])
                     specs.append(data[1])
@@ -196,17 +193,17 @@ class AppLogic:
                     recs.append(data[4])
                     fs.append(data[5])
                     mccs.append(data[6])
-                if len(self.splits) > 1:
+                if len(self.splits.keys()) > 1:
                     self.cv_averages = create_cv_accumulation(accs, fs, mccs, precs, recs)
 
                 state = state_writing_results
 
             if state == state_writing_results:
                 print('[CLIENT] Save results')
-                for split in self.splits:
+                for split in self.splits.keys():
                     self.score_dfs[split].to_csv(split.replace("/input/", "/output/") + "/scores.csv", index=False)
 
-                if len(self.splits) > 1:
+                if len(self.splits.keys()) > 1:
                     self.cv_averages.to_csv(self.OUTPUT_DIR + "/cv_evaluation.csv", index=False)
 
                     plt = plot_boxplots(self.cv_averages, title=f'{len(self.splits)}-fold Cross Validation' )
@@ -238,8 +235,7 @@ class AppLogic:
                     print("[CLIENT] Aggregate confusion matrices", flush=True)
                     data = [jsonpickle.decode(client_data) for client_data in self.data_incoming]
                     self.data_incoming = []
-                    print(data)
-                    for split in self.splits:
+                    for split in self.splits.keys():
                         split_data = []
                         for client in data:
                             split_data.append(client[split])
