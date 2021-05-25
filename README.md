@@ -1,7 +1,7 @@
 # Classification Evaluation FeatureCloud App
 
 ## Description
-A Classification Evaluation FeautureCloud app, allowing to evaluate your trained models with various regression metrics (e.g. Accuracy).
+A Classification Evaluation FeautureCloud app, allowing to evaluate your trained models with various classification metrics (e.g. Accuracy).
 
 ## Input
 - test.csv containing the actual test dataset
