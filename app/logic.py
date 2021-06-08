@@ -201,7 +201,7 @@ class AppLogic:
             if state == state_writing_results:
                 print('[CLIENT] Save results')
                 for split in self.splits.keys():
-                    self.score_dfs[split].to_csv(split.replace("/input/", "/output/") + "/scores.csv", index=False)
+                    self.score_dfs[split].to_csv(split.replace("/input", "/output") + "/scores.csv", index=False)
 
                 if len(self.splits.keys()) > 1:
                     self.cv_averages.to_csv(self.OUTPUT_DIR + "/cv_evaluation.csv", index=False)
