@@ -1,6 +1,6 @@
 FROM python:3.7-slim-stretch
 
-RUN apt-get update && apt-get install -y supervisor nginx
+RUN apt-get update && apt-get install -y supervisor nginx gcc
 RUN pip3 install --upgrade pip
 
 COPY server_config/supervisord.conf /supervisord.conf

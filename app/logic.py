@@ -204,12 +204,14 @@ class AppLogic:
                     self.score_dfs[split].to_csv(split.replace("/input", "/output") + "/scores.csv", index=False)
 
                 if len(self.splits.keys()) > 1:
+
                     self.cv_averages.to_csv(self.OUTPUT_DIR + "/cv_evaluation.csv", index=False)
 
+                    print("[CLIENT] Plot images")
                     plt = plot_boxplots(self.cv_averages, title=f'{len(self.splits)}-fold Cross Validation' )
-                    plt.write_image(f'{self.OUTPUT_DIR}/boxplot.png', format="png", engine="kaleido")
-                    plt.write_image(f'{self.OUTPUT_DIR}/boxplot.svg', format="svg", engine="kaleido")
-                    plt.write_image(f'{self.OUTPUT_DIR}/boxplot.pdf', format="pdf", engine="kaleido")
+                    plt.write_image(self.OUTPUT_DIR + "/boxplot.png", format="png", engine="kaleido")
+                    plt.write_image(self.OUTPUT_DIR + "/boxplot.svg", format="svg", engine="kaleido")
+                    plt.write_image(self.OUTPUT_DIR + "/boxplot.pdf", format="pdf", engine="kaleido")
 
                 if self.coordinator:
                     self.data_incoming = ['DONE']
