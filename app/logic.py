@@ -208,10 +208,14 @@ class AppLogic:
                     self.cv_averages.to_csv(self.OUTPUT_DIR + "/cv_evaluation.csv", index=False)
 
                     print("[CLIENT] Plot images")
-                    plt = plot_boxplots(self.cv_averages, title=f'{len(self.splits)}-fold Cross Validation' )
-                    plt.write_image(self.OUTPUT_DIR + "/boxplot.png", format="png", engine="kaleido")
-                    plt.write_image(self.OUTPUT_DIR + "/boxplot.svg", format="svg", engine="kaleido")
-                    plt.write_image(self.OUTPUT_DIR + "/boxplot.pdf", format="pdf", engine="kaleido")
+                    plt = plot_boxplots(self.cv_averages, title=f'{len(self.splits)}-fold Cross Validation')
+
+                    for format in ["png", "svg", "pdf"]:
+                        try:
+                            plt.write_image(self.OUTPUT_DIR + "/boxplot." + format, format=format, engine="kaleido")
+                        except Exception as e:
+                            print("Could not save plot as " + format + ".")
+                            print(e)
 
                 if self.coordinator:
                     self.data_incoming = ['DONE']
