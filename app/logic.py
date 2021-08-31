@@ -218,7 +218,7 @@ class AppLogic:
                             print(e)
 
                 if self.coordinator:
-                    self.data_incoming = ['DONE']
+                    self.data_incoming.append('DONE')
                     state = state_finishing
                 else:
                     self.data_outgoing = 'DONE'

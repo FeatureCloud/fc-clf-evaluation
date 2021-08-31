@@ -1,4 +1,4 @@
-FROM python:3.7-stretch
+FROM python:3.7-slim-stretch
 
 RUN apt-get update && apt-get install -y supervisor nginx gcc
 RUN pip3 install --upgrade pip
@@ -15,3 +15,5 @@ COPY . /app
 EXPOSE 9000 9001
 
 ENTRYPOINT ["sh", "/entrypoint.sh"]
+
+
